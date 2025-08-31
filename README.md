@@ -41,39 +41,63 @@ Proyecto FastAPI que aborda tres áreas: Algoritmos y Estructuras de Datos, Dise
 
 ## 2. Diseño y Arquitectura del Sistema
 
-Escenario: start-up de delivery en rápido crecimiento, se busca escalabilidad, fiabilidad y mantenibilidad. Este repo exhibe una versión monolítica bien estructurada con separación por capas (API, servicios, algoritmos, esquemas), preparada para evolucionar a servicios.
+### Escenario
 
-### 2.1 Visión de arquitectura distribuida propuesta
-- **API Gateway**: expone REST/HTTP y autentica; enruta a microservicios.
-- **Microservicios**: `orders/pricing`, `analytics`, `transit`, `catalog/inventory`, `users`, etc.
-- **Mensajería**: cola/stream (p. ej., Kafka/RabbitMQ) para eventos de pedidos, pagos, actualizaciones de inventario.
-- **Datos**:
-  - OLTP por dominio (p. ej., Postgres para pedidos/usuarios, Redis para caché, Elastic para búsqueda, S3/lake para históricos).
-  - OLAP/Streaming (p. ej., Kafka + Flink/Spark + warehouse) para analítica near-real-time.
-- **Caching**: Redis para respuestas calientes (cotizaciones, catálogos, rutas).
-- **Observabilidad**: logs estructurados, métricas (Prometheus), trazas (OpenTelemetry).
-- **Infra**: contenedores (Docker), orquestación (Kubernetes), despliegues blue/green o canary, autoescalado.
+Una startup local de reparto de comida a domicilio está experimentando un rápido crecimiento y necesita rediseñar su sistema backend. El sistema actual es una aplicación monolítica que presenta limitaciones en rendimiento, escalabilidad y facilidad de mantenimiento. El objetivo es construir una arquitectura distribuida que soporte el crecimiento, permita integrar nuevas funcionalidades de forma modular y mejore la fiabilidad de la operación.
 
-### 2.2 Diseño de API y contratos
-- Contratos versionados (`/api/v1/...`) con `pydantic` como esquema de validación y OpenAPI generado por FastAPI.
-- Idempotencia en endpoints de mutación cuando aplique; códigos de estado adecuados (400/404/409, etc.).
+### Desafíos principales
+- **Escalabilidad horizontal**: soportar picos de demanda.
+- **Fiabilidad y tolerancia a fallos**: en órdenes y asignación de repartidores.
+- **Desac acoplamiento con colas de mensajes**: reducir dependencias temporales.
+- **Diseño de APIs claras**: versionadas y fáciles de mantener.
+- **Caché**: optimizar consultas frecuentes.
+- **Persistencia de datos distribuida**: orientada a casos de uso transaccional, geoespacial y analítica.
 
-### 2.3 Estrategia de datos y consistencia
-- Consistencia fuerte dentro de cada servicio; consistencia eventual entre dominios mediante eventos.
-- Esquemas evolutivos con migraciones por servicio; CDC para sincronizaciones analíticas.
+### Arquitectura propuesta
 
-### 2.4 Colas de mensajes y patrones
-- Event-driven: `OrderCreated`, `PaymentAuthorized`, `OrderDispatched`.
-- Patrones: outbox/inbox, saga orchestration para flujos largo alcance.
+Se diseña una arquitectura distribuida basada en microservicios y eventos, con componentes desacoplados:
 
-### 2.5 Espacio reservado para diagramas
-- [Pendiente] Inserte aquí los diagramas de:
-  - Contexto (C4-1)
-  - Contenedores/servicios (C4-2)
-  - Componentes clave por servicio (C4-3)
-  - Flujos de eventos (pedido de punta a punta)
+- **Capa de acceso y seguridad**:
+  - Autenticación y autorización centralizadas.
+  - CDN y entrega segura de aplicaciones web y móviles.
 
----
+- **Servicio de órdenes**:
+  - Recibe, valida y procesa pedidos.
+  - Persistencia en base de datos transaccional.
+  - Publica eventos a colas para notificaciones y asignación de repartidores.
+
+- **Sistema de reparto de última milla**:
+  - Asignación de repartidores y cálculo de rutas óptimas.
+  - Integración con servicio de localización para ETAs.
+  - Base de datos de grafos para rutas y ubicaciones.
+
+- **Servicio de localización**:
+  - Geolocalización de clientes, comercios y repartidores.
+  - Cálculo de rutas, ETAs y geocercas (geofencing).
+
+- **Sistema de analítica y monitoreo operacional**:
+  - Ingesta de eventos (órdenes, rutas, estados de entrega).
+  - Métricas en tiempo real y tableros; almacenamiento histórico en data lake.
+
+- **Capa de observabilidad**:
+  - Métricas, logs y trazas distribuidas para confiabilidad y diagnóstico.
+
+### Flujo del sistema (alto nivel)
+1. El cliente (web/móvil) se autentica.
+2. El servicio de órdenes registra el pedido en la base transaccional.
+3. Se emite un evento a la cola para notificar al sistema de última milla.
+4. Última milla consulta localización, estima rutas y asigna repartidor.
+5. Analítica consume eventos en tiempo real (órdenes, asignaciones, entregas) para generar métricas.
+6. Observabilidad traza el flujo end-to-end y levanta alertas ante fallos o retrasos.
+
+### Diagramas
+**Arquitectura Detallada**  
+![Arquitectura Detallada](./docs/arquitectura_detallada.png)
+
+**Diagrama de Contexto**  
+![Diagrama de Contexto](./docs/diagrama_contexto.png)
+
+Con esta arquitectura, el sistema evoluciona de un monolito rígido a un ecosistema distribuido, desacoplado y tolerante a fallos, preparado para el crecimiento y la incorporación ágil de nuevas funcionalidades sin afectar la operación existente.
 
 ## 3. Codificación y Resolución de Problemas (API REST)
 
@@ -166,6 +190,8 @@ Configurar en `.env` si desea cambiar reglas:
   - `pytest -q`
 - Cobertura:
   - `pytest --cov=app -q`
+- Con Docker Compose (dentro del contenedor):
+  - `docker compose exec api sh -lc "pytest -q"`
 
 ### Probar endpoints manualmente
 - Cotización:

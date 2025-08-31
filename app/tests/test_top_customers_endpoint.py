@@ -16,7 +16,15 @@ def test_top_customers_api_tmp(tmp_path):
     p = tmp_path/"transactions.csv.gz"
     _make_small_csv(p)
     client = TestClient(app)
-    payload = {"path": str(p), "days": 1000, "k": 2, "mode":"auto"}
+    payload = {
+        "path": str(p),
+        "days": None,
+        # usamos ventana explícita que incluye timestamps 1..6
+        "start": "1970-01-01T00:00:00Z",
+        "end": "1970-01-01T00:00:10Z",
+        "top_customers": 2,
+        "mode": "auto",
+    }
     res = client.post("/api/v1/analytics/top-customers", json=payload)
     assert res.status_code == 200
     data = res.json()

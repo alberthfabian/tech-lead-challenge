@@ -4,6 +4,8 @@ services:
     build: .
     container_name: tech_lead_api
     env_file: .env
+    environment:
+      - PYTHONPATH=/app
     ports:
       - "8000:8000"
     volumes:
